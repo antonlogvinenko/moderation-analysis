@@ -1,5 +1,8 @@
 (ns moderation-analysis.core
-  (:require [clojure.java.jdbc :as sql]))
+  (:require [clojure.java.jdbc :as sql]
+            [clojure.string :as string])
+  (:use [incanter core charts stats datasets]))
+
 
 (def mysql-properties {:classname "com.mysql.jdbc.Driver"
                        :subprotocol "mysql"
@@ -25,16 +28,34 @@
       result (-> result first :c)))
 
 (defn get-rating [user]
-  (/ (get-decisions "declined" user) (get-decisions "approved" user)))
+  (let [a (get-decisions "approved" user)
+        d (get-decisions "declined" user)
+        sum (+ a d)]
+    (if (zero? sum) 0 (/ a sum))))
 
-(defn save [ratings]
+;720456
+(def c 720456)
+
+(defn save-data [ratings]
   (doseq [rating ratings]
-    (println rating)))
+    (spit "ratings.txt"
+          (str rating " ")
+          :append true)))
   
 (defn run []
   (walk-rows
-      ["select distinct bulletin_owner_id from bulletin_moderation_history limit 100"]
+      ["select distinct bulletin_owner_id from bulletin_moderation_history limit ?" c]
       users
     (->> users (map :bulletin_owner_id) (map get-rating) save)))
-    
-    
+
+
+(def default-width 1100)
+(def default-height 440)
+
+(defn show [n]
+  (let [ratings-str (-> "ratings.txt" slurp (string/split #" "))
+        ratings (->> ratings-str (map read-string) (take n))]
+    (-> ratings
+        (histogram :x-label "rating" :nbins 50)
+        (view :width default-width :height default-height))))
+
