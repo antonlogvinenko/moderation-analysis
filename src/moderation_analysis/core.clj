@@ -47,7 +47,7 @@
   (walk-rows
       ["select distinct bulletin_owner_id from bulletin_moderation_history limit ?" c]
       users
-    (->> users (map :bulletin_owner_id) (map get-rating) save)))
+    (->> users (map :bulletin_owner_id) (map get-rating) save-data)))
 
 
 (def default-width 1100)
