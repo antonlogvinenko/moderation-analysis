@@ -14,13 +14,14 @@
   `(sql/with-connection mysql-properties
       (sql/with-query-results ~results ~query ~@body)))
 
+(def lazy
+  {:fetch-size Integer/MIN_VALUE
+   :prefetch-size 10000
+   :chunk-size 10000})
+
 (defmacro walk-rows [query results & body]
   `(with-connection
-       (->> ~query
-            (cons {:fetch-size Integer/MIN_VALUE
-                   :prefetch-size 10000
-                   :chunk-size 10000})
-            vec)
+       (->> ~query (cons lazy) vec)
        ~results ~@body))
 
 (defn get-decisions [status user]
@@ -56,6 +57,6 @@
   (let [ratings-str (-> "ratings.txt" slurp (string/split #" "))
         ratings (->> ratings-str (map read-string) (take n))]
     (-> ratings
-        (histogram :x-label "rating" :nbins 50)
+        (histogram :x-label "rating" :nbins 30)
         (view :width default-width :height default-height))))
 
