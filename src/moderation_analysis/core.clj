@@ -69,8 +69,25 @@
                     :user "bul_history"
                     :password (slurp "pswd.txt")})
 
-(defn get-history []
-  (walk-rows mysql-history
-      ["select * from history2 limit 1"]
+(defn get-stat [history]
+(->> history (map :bulletin.adminPublishStatus) println){}
+  )
+
+(defn analyze-hist [stat row]
+  (->> row get-stat (merge-with + stat)))
+
+(defn get-history [row]
+  (let [json-row (-> row :history json/read-json)
+        json-history (if (-> row :type (= "bulletin"))
+                       (json-row :ol)
+                       (json-row :ul))]
+    (map :state json-history)))
+
+(defn analyze-history [limit]
+  (walk-rows
+      mysql-history
+      ["select * from history2 where user_space_id=14656393 and type='bulletin' limit ?" limit]
       rows
-    (-> rows first :history json/read-json)))
+    (->> rows
+         (map get-history)
+         (reduce analyze-hist {}))))
