@@ -63,31 +63,35 @@
         (view :width default-width :height default-height))))
 
 
+;; Analyzing moderation bulletin history
+
+
 (def mysql-history {:classname "com.mysql.jdbc.Driver"
                     :subprotocol "mysql"
                     :subname "//127.0.0.1:3307/bul_history"
                     :user "bul_history"
                     :password (slurp "pswd.txt")})
 
-(defn get-stat [history]
-(->> history (map :bulletin.adminPublishStatus) println){}
-  )
+(defn count-versions [history]
+  (count history))
 
-(defn analyze-hist [stat row]
-  (->> row get-stat (merge-with + stat)))
+(defn count-premoderation [history]
+  (->> history (map :bulletin.adminPublishStatus) (filter #(= % -1)) count))
+
+
+
+(defn create-analyze-hist [get-stat-fn]
+  (fn [stat row]
+    (update-in stat [(get-stat-fn row)] #(if (nil? %) 1 (inc %)))))
 
 (defn get-history [row]
-  (let [json-row (-> row :history json/read-json)
-        json-history (if (-> row :type (= "bulletin"))
-                       (json-row :ol)
-                       (json-row :ul))]
-    (map :state json-history)))
+  (->> row :history json/read-json :ol (map :state)))
 
-(defn analyze-history [limit]
+(defn analyze-history [limit stat-fn]
   (walk-rows
       mysql-history
-      ["select * from history2 where user_space_id=14656393 and type='bulletin' limit ?" limit]
+      ["select * from history2 where type='bulletin' order by id desc limit ?" limit]
       rows
     (->> rows
          (map get-history)
-         (reduce analyze-hist {}))))
+         (reduce (create-analyze-hist stat-fn) {}))))
