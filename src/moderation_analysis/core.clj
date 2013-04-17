@@ -65,18 +65,19 @@
 
 ;; Analyzing moderation bulletin history
 
+(defn debug [x] (println x) x)
 
 (def mysql-history {:classname "com.mysql.jdbc.Driver"
                     :subprotocol "mysql"
-                    :subname "//127.0.0.1:3307/bul_history"
-                    :user "bul_history"
-                    :password (slurp "pswd.txt")})
+                    :subname "//127.0.0.1:3306/bul_history"
+                    :user "anton"
+                    :password ""})
 
 (defn count-versions [history]
   (count history))
 
 (defn count-premoderation [history]
-  (->> history (map :bulletin.adminPublishStatus) (filter #(= % -1)) count))
+  (->> history (map :bulletin.adminPublishStatus) (filter #(contains? [0 1] %)) count))
 
 
 
@@ -87,10 +88,10 @@
 (defn get-history [row]
   (->> row :history json/read-json :ol (map :state)))
 
-(defn analyze-history [limit stat-fn]
+(defn analyze-history [offset limit stat-fn]
   (walk-rows
       mysql-history
-      ["select * from history2 where type='bulletin' order by id desc limit ?" limit]
+      ["select * from history2 where type='bulletin' order by id desc limit ?, ?" offset limit]
       rows
     (->> rows
          (map get-history)
