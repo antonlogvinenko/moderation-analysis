@@ -1,5 +1,5 @@
 (ns moderation-analysis.core
-  (:require [clojure.java.jdbc :as sql]
+   (:require [clojure.java.jdbc :as sql]
             [clojure.string :as string]
             [clojure.data.json :as json])
   (:use [incanter core charts stats datasets]))
@@ -76,23 +76,54 @@
 (defn count-versions [history]
   (count history))
 
-(defn count-premoderation [history]
-  (->> history (map :bulletin.adminPublishStatus) (filter #(contains? [0 1] %)) count))
+(defn moder-pred [status]
+  (or (= status 0) (= status -1)))
+  
+(defn count-moderation [history]
+  (let [moderated-amount (->> history
+                              (map :bulletin.adminPublishStatus)
+                              (filter moder-pred)
+                              count)]
+    {moderated-amount 1}))
 
 
+(defn first-moderation [history]
+  (let [first-index (->> history
+                         (filter #(-> % :bulletin.adminPublishStatus moder-pred))
+                         first
+                         :bulletin.version)]
+    {first-index 1}))
+
+(defn dir-moderation [history]
+  {(-> history first :bulletin.dir)
+   (->> history count-moderation keys first)})
+
+(defn bull-distr [history]
+  {(-> history first :bulletin.dir) 1})
+
+
+
+
+
+(defn sort-distr [distr]
+  (->> distr
+       (sort #(> (val %1) (val %2)))))
 
 (defn create-analyze-hist [get-stat-fn]
   (fn [stat row]
-    (update-in stat [(get-stat-fn row)] #(if (nil? %) 1 (inc %)))))
+    (->> row
+         get-stat-fn
+         (merge-with + stat))))
 
 (defn get-history [row]
   (->> row :history json/read-json :ol (map :state)))
 
-(defn analyze-history [offset limit stat-fn]
+(defn analyze-history [limit stat-fn]
   (walk-rows
       mysql-history
-      ["select * from history2 where type='bulletin' order by id desc limit ?, ?" offset limit]
+      ["select * from history2 where type='bulletin' order by id desc limit ?" limit]
       rows
     (->> rows
          (map get-history)
-         (reduce (create-analyze-hist stat-fn) {}))))
+         (reduce (create-analyze-hist stat-fn) {})
+         sort-distr)))
