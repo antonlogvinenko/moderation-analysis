@@ -17,6 +17,8 @@
 
 (def lazy
   {:fetch-size Integer/MIN_VALUE
+   :concurrency :read-only
+   :result-type :forward-only
    :prefetch-size 10000
    :chunk-size 10000})
 
@@ -101,9 +103,22 @@
 (defn bull-distr [history]
   {(-> history first :bulletin.dir) 1})
 
+(defn status-distr [history]
+  {(-> history first :bulletin.adminPublishStatus) 1})
 
+(defn fake-distr [history] (println history))
 
+(def stat {:adminStatusDistribution
+           (fn [h]
+             {(-> h first :bulletin.adminPublishStatus) 1})
 
+           :bulltinsDistribution
+           (fn [h]
+             {(-> h first :bulletin.dir) 1})
+           
+           })
+
+(defn run-stat [])
 
 (defn sort-distr [distr]
   (->> distr
@@ -121,9 +136,26 @@
 (defn analyze-history [limit stat-fn]
   (walk-rows
       mysql-history
-      ["select * from history2 where type='bulletin' order by id desc limit ?" limit]
+      ["select * from history2 where type='bulletin' order by user_space_id desc limit ?" limit]
       rows
     (->> rows
-         (map get-history)
+         (take 2)
+         (pmap get-history)
          (reduce (create-analyze-hist stat-fn) {})
          sort-distr)))
+
+(defn aaa [{overall :overall time :time} y]
+  (if (-> overall (rem 1000000) zero?)
+    (let [now (System/currentTimeMillis)]
+      (do (-> now (- time) (/ 1000) double (println overall " - "))
+          {:overall (inc overall) :time now}))
+    {:overall (inc overall) :time time}))
+
+
+(defn mysql-slow [limit]
+  (walk-rows
+      mysql-history
+      ["select * from history2 limit ?" limit]
+      rows
+    (->> rows (reduce aaa {:overall 0 :time (System/currentTimeMillis)}))))
+         
