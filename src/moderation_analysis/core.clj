@@ -90,24 +90,24 @@
                               count)]
     {moderated-amount 1}))
 
-(def stat {:initialAdminPublishStatusByBulletin
+(def stat {:bulletinByInitialAdminPublishStatus
            (fn [h] {(-> h first :bulletin.adminPublishStatus) 1})
 
-           :directoriyByBulletin
+           :bulletinByDirectory
            (fn [h] {(-> h first :bulletin.dir) 1})
 
-           :directoriyByEnqueue
+           :enqueueByDirectory
            (fn [h] {(-> h first :bulletin.dir)
                     (->> h count-moderation keys first)})
 
-           :firstEnqueueVersionByBulletin
+           :bulletinByFirstEnqueueVersion
            (fn [h] (let [first-index (->> h
                                           (filter #(-> % :bulletin.adminPublishStatus moder-pred))
                                           first
                                           :bulletin.version)]
                      {first-index 1}))
              
-           :enqueueAmountByBulletin
+           :bulletinByEnqueueAmount
            count-moderation         
            })
 
@@ -125,21 +125,19 @@
           [k (sort-distr v)])))
 
 (defn merge-stat [stat new-stat]
-  (into {}
-        (for [[k v] new-stat]
-          [k (merge-with + v (k new-stat))])))
+  (merge-with (partial merge-with +) stat new-stat))
 
 (defn get-stat [row]
   (into {}
         (for [[name fun] stat]
-          [name (fun stat)])))
+          [name (fun row)])))
     
 (defn row-analysis [{overall :overall time :time stat :stat} row]
   (let [row-stat (get-stat row)
         new-stat (merge-stat stat row-stat)
         overall (inc overall)
         now (System/currentTimeMillis)
-        new-time (if (-> overall (rem 100000) zero?)
+        new-time (if (-> overall (rem 10000) zero?)
                    (do (-> now (- time) (/ 1000) double (println " sec - " overall))
                        now)
                    time)]
@@ -150,10 +148,9 @@
 (defn analyze-hist [request file limit]
   (walk-rows mysql-history [request limit] rows
     (->> rows
-         (take 2)
          (pmap get-history)
          (reduce row-analysis {:overall 0 :time (System/currentTimeMillis) :stat {}})
          :stat
          sort-stat
-         (spit file))))         
+         (spit file))))
          
