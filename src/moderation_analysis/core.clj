@@ -90,24 +90,24 @@
                               count)]
     {moderated-amount 1}))
 
-(def stat {:adminStatusDistribution
+(def stat {:initialAdminPublishStatusByBulletin
            (fn [h] {(-> h first :bulletin.adminPublishStatus) 1})
 
-           :bulltinsDistribution
+           :directoriyByBulletin
            (fn [h] {(-> h first :bulletin.dir) 1})
 
-           :dirModeration
+           :directoriyByEnqueue
            (fn [h] {(-> h first :bulletin.dir)
                     (->> h count-moderation keys first)})
 
-           :firstModeration
+           :firstEnqueueVersionByBulletin
            (fn [h] (let [first-index (->> h
                                           (filter #(-> % :bulletin.adminPublishStatus moder-pred))
                                           first
                                           :bulletin.version)]
                      {first-index 1}))
              
-           :countModeration
+           :enqueueAmountByBulletin
            count-moderation         
            })
 
