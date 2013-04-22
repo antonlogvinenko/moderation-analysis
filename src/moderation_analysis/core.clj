@@ -143,7 +143,7 @@
                    time)]
     {:overall overall :time new-time :stat new-stat}))
 
-(def sql-request "select * from history2 limit ?")
+(def sql-request "select * from history2 where type='bulletin' order by user_space_id desc limit ?")
 
 (defn analyze-hist [request file limit]
   (walk-rows mysql-history [request limit] rows
