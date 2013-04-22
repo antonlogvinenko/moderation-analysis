@@ -117,8 +117,7 @@
 
 (defn sort-distr [distr]
   (->> distr
-       (sort #(> (val %1) (val %2)))
-       (into (sorted-map))))
+       (sort #(> (val %1) (val %2)))))
 
 (defn sort-stat [stat]
   (into {}
