@@ -131,7 +131,7 @@
   (into {}
         (for [[name fun] stat]
           [name (fun row)])))
-    
+
 (defn row-analysis [{overall :overall time :time stat :stat} row]
   (let [row-stat (get-stat row)
         new-stat (merge-stat stat row-stat)
@@ -143,7 +143,10 @@
                    time)]
     {:overall overall :time new-time :stat new-stat}))
 
-(def sql-request "select * from history2 where type='bulletin' order by id desc limit ?")
+(def sql-request "select * from history2 where type='bulletin' order by user_space_id desc limit ?")
+
+(def queue-request "select * from priority_moderation_queue as l left join history2 as r on l.bulletin_id = r.user_space_id where r.type='bulletin' limit ?")
+
 
 (defn analyze-hist [request file limit]
   (walk-rows mysql-history [request limit] rows
