@@ -90,15 +90,8 @@
                               count)]
     {moderated-amount 1}))
 
-(def stat {:bulletinByInitialAdminPublishStatus
-           (fn [h] {(-> h first :bulletin.adminPublishStatus) 1})
-
-           :bulletinByDirectory
-           (fn [h] {(-> h first :bulletin.dir) 1})
-
-           :enqueueByDirectory
-           (fn [h] {(-> h first :bulletin.dir)
-                    (->> h count-moderation keys first)})
+(def stat {:bulletinByEnqueueAmount
+           count-moderation
 
            :bulletinByFirstEnqueueVersion
            (fn [h] (let [first-index (->> h
@@ -106,9 +99,17 @@
                                           first
                                           :bulletin.version)]
                      {first-index 1}))
-             
-           :bulletinByEnqueueAmount
-           count-moderation         
+           
+           :bulletinByInitialAdminPublishStatus
+           (fn [h] {(-> h first :bulletin.adminPublishStatus) 1})
+           
+           :bulletinByDirectory
+           (fn [h] {(-> h first :bulletin.dir) 1})
+           
+           :enqueueByDirectory
+           (fn [h] {(-> h first :bulletin.dir)
+                    (->> h count-moderation keys first)})
+           
            })
 
 (defn get-history [row]
@@ -117,7 +118,7 @@
 (defn sort-distr [distr]
   (->> distr
        (sort #(> (val %1) (val %2)))
-       (into {})))
+       (into (sorted-map))))
 
 (defn sort-stat [stat]
   (into {}
@@ -143,7 +144,7 @@
                    time)]
     {:overall overall :time new-time :stat new-stat}))
 
-(def sql-request "select * from history2 where type='bulletin' order by user_space_id desc limit ?")
+(def sql-request "select * from history2 where type='bulletin' order by id desc limit ?")
 
 (defn analyze-hist [request file limit]
   (walk-rows mysql-history [request limit] rows
