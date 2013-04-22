@@ -126,7 +126,7 @@
 
 (defn merge-stat [stat new-stat]
   (into {}
-        (for [[k v] stat]
+        (for [[k v] new-stat]
           [k (merge-with + v (k new-stat))])))
 
 (defn get-stat [row]
@@ -134,8 +134,6 @@
         (for [[name fun] stat]
           [name (fun stat)])))
     
-  
-
 (defn row-analysis [{overall :overall time :time stat :stat} row]
   (let [row-stat (get-stat row)
         new-stat (merge-stat stat row-stat)
@@ -147,13 +145,14 @@
                    time)]
     {:overall overall :time new-time :stat new-stat}))
 
-(defn sql-request "select * from history2 limit ?")
+(def sql-request "select * from history2 limit ?")
 
 (defn analyze-hist [request file limit]
   (walk-rows mysql-history [request limit] rows
     (->> rows
+         (take 2)
          (pmap get-history)
-         (reduce row-analysis {:overall 0 :time (System/currentTimeMillis)} :stat {})
+         (reduce row-analysis {:overall 0 :time (System/currentTimeMillis) :stat {}})
          :stat
          sort-stat
          (spit file))))         
