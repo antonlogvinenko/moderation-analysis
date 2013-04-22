@@ -65,6 +65,8 @@
         (view :width default-width :height default-height))))
 
 
+
+
 ;; Analyzing moderation bulletin history
 
 (defn debug [x] (println x) x)
@@ -88,74 +90,71 @@
                               count)]
     {moderated-amount 1}))
 
-
-(defn first-moderation [history]
-  (let [first-index (->> history
-                         (filter #(-> % :bulletin.adminPublishStatus moder-pred))
-                         first
-                         :bulletin.version)]
-    {first-index 1}))
-
-(defn dir-moderation [history]
-  {(-> history first :bulletin.dir)
-   (->> history count-moderation keys first)})
-
-(defn bull-distr [history]
-  {(-> history first :bulletin.dir) 1})
-
-(defn status-distr [history]
-  {(-> history first :bulletin.adminPublishStatus) 1})
-
-(defn fake-distr [history] (println history))
-
 (def stat {:adminStatusDistribution
-           (fn [h]
-             {(-> h first :bulletin.adminPublishStatus) 1})
+           (fn [h] {(-> h first :bulletin.adminPublishStatus) 1})
 
            :bulltinsDistribution
-           (fn [h]
-             {(-> h first :bulletin.dir) 1})
-           
+           (fn [h] {(-> h first :bulletin.dir) 1})
+
+           :dirModeration
+           (fn [h] {(-> h first :bulletin.dir)
+                    (->> h count-moderation keys first)})
+
+           :firstModeration
+           (fn [h] (let [first-index (->> h
+                                          (filter #(-> % :bulletin.adminPublishStatus moder-pred))
+                                          first
+                                          :bulletin.version)]
+                     {first-index 1}))
+             
+           :countModeration
+           count-moderation         
            })
-
-(defn run-stat [])
-
-(defn sort-distr [distr]
-  (->> distr
-       (sort #(> (val %1) (val %2)))))
-
-(defn create-analyze-hist [get-stat-fn]
-  (fn [stat row]
-    (->> row
-         get-stat-fn
-         (merge-with + stat))))
 
 (defn get-history [row]
   (->> row :history json/read-json :ol (map :state)))
 
-(defn analyze-history [limit stat-fn]
-  (walk-rows
-      mysql-history
-      ["select * from history2 where type='bulletin' order by user_space_id desc limit ?" limit]
-      rows
+(defn sort-distr [distr]
+  (->> distr
+       (sort #(> (val %1) (val %2)))
+       (into {})))
+
+(defn sort-stat [stat]
+  (into {}
+        (for [[k v] stat]
+          [k (sort-distr v)])))
+
+(defn merge-stat [stat new-stat]
+  (into {}
+        (for [[k v] stat]
+          [k (merge-with + v (k new-stat))])))
+
+(defn get-stat [row]
+  (into {}
+        (for [[name fun] stat]
+          [name (fun stat)])))
+    
+  
+
+(defn row-analysis [{overall :overall time :time stat :stat} row]
+  (let [row-stat (get-stat row)
+        new-stat (merge-stat stat row-stat)
+        overall (inc overall)
+        now (System/currentTimeMillis)
+        new-time (if (-> overall (rem 100000) zero?)
+                   (do (-> now (- time) (/ 1000) double (println " sec - " overall))
+                       now)
+                   time)]
+    {:overall overall :time new-time :stat new-stat}))
+
+(defn sql-request "select * from history2 limit ?")
+
+(defn analyze-hist [request file limit]
+  (walk-rows mysql-history [request limit] rows
     (->> rows
-         (take 2)
          (pmap get-history)
-         (reduce (create-analyze-hist stat-fn) {})
-         sort-distr)))
-
-(defn aaa [{overall :overall time :time} y]
-  (if (-> overall (rem 1000000) zero?)
-    (let [now (System/currentTimeMillis)]
-      (do (-> now (- time) (/ 1000) double (println overall " - "))
-          {:overall (inc overall) :time now}))
-    {:overall (inc overall) :time time}))
-
-
-(defn mysql-slow [limit]
-  (walk-rows
-      mysql-history
-      ["select * from history2 limit ?" limit]
-      rows
-    (->> rows (reduce aaa {:overall 0 :time (System/currentTimeMillis)}))))
+         (reduce row-analysis {:overall 0 :time (System/currentTimeMillis)} :stat {})
+         :stat
+         sort-stat
+         (spit file))))         
          
