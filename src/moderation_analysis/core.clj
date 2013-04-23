@@ -147,6 +147,7 @@
 
 (def queue-request "select * from priority_moderation_queue as l left join history2 as r on l.bulletin_id = r.user_space_id where r.type='bulletin' limit ?")
 
+(def all-bulletins "select * from history2 where type='bulletin' limit ?")
 
 (defn analyze-hist [request file limit]
   (walk-rows mysql-history [request limit] rows
@@ -156,4 +157,18 @@
          :stat
          sort-stat
          (spit file))))
-         
+
+(defn split-files []
+  (let [file-names ["1", "5", "10", "all", "queue"]
+        prefix "stats/dist-"
+        dir-prefix "./stats/dir/"
+        stat-prefix "./stats/stat/"
+        dir-keys [:bulletinByDirectory, :enqueueByDirectory]
+        stat-keys [:bulletinByFirstEnqueueVersion, :bulletinByEnqueueAmount, :bulletinByInitialAdminPublishStatus]
+        maps (into {} (for [name file-names]
+                        [name (->> name (str prefix) slurp read-string)]))]
+    (for [[name stats] maps]
+      (do
+        (spit (str dir-prefix name) (select-keys stats dir-keys))
+        (spit (str stat-prefix name) (select-keys stats stat-keys))))))
+    
