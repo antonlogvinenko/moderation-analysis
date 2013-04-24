@@ -161,10 +161,13 @@
 (defn map-values [f m]
   (into {} (for [[k v] m] [k (f v)])))
 
-(defn normalize-distribution [m]
+(defn invert-values [f m]
+  (into (sorted-map) (for [[k v] m] [(f v) k])))
+
+(defn normalize-distribution-1 [m]
   (let [overall (->> m vals (apply +))
         form (partial format "%.2f")]
-    (map-values #(-> % (/ overall) (* 100) double form) m)))
+    (invert-values #(-> % (/ overall) (* 100) double form read-string) m)))
 
 (defn split-files []
   (let [file-names ["1", "5", "10", "all", "queue"]
@@ -178,9 +181,9 @@
                                    (str prefix)
                                    slurp
                                    read-string
-                                   debug
-                                   (map-values (comp (partial into {}) normalize-distribution))
-                                   sort-stat)]))]
+                                   (map-values (partial into {}))
+                                   (map-values normalize-distribution-1)
+                                   )]))]
     (for [[name stats] maps]
       (do
         (spit (str dir-prefix name) (select-keys stats dir-keys))
