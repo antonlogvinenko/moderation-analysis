@@ -2,7 +2,8 @@
    (:require [clojure.java.jdbc :as sql]
             [clojure.string :as string]
             [clojure.data.json :as json])
-  (:use [incanter core charts stats datasets]))
+   (:use [incanter core charts stats datasets])
+   (:import [org.tartarus.snowball.ext RussianStemmer]))
 
 
 (def mysql-properties {:classname "com.mysql.jdbc.Driver"
@@ -63,7 +64,6 @@
     (-> ratings
         (histogram :x-label "rating" :nbins 30)
         (view :width default-width :height default-height))))
-
 
 
 
@@ -174,14 +174,24 @@
 
 (def all-bulletins "select * from history2 where type='bulletin' limit ?")
 
+(def stemmer (RussianStemmer.))
+
+(defn remove-shit [word] word)
+
+(defn get-stem [word]
+  (doto stemmer (.setCurrent word) .stem)
+  (.getCurrent stemmer))
+
+(defn fuck-a-word [word]
+  (-> word .trim .toLowerCase remove-shit get-stem))
 
 (defn get-added-words [[l r] history]
   (let [history (->> history (take (inc r)) (reductions merge) (map :bulletin.text))
-        to-words (fn [str] (->> str (.split #" ") vec))
+        to-words (fn [str] (->> str (.split #"\W+") vec))
         left (apply hash-set (-> history (nth l) to-words distinct))
         right (apply hash-set (-> history (nth r) to-words distinct))
         difff (clojure.set/difference right left)]
-    (map #(.trim %) difff)))
+    (map fuck-a-word difff)))
         
 
 (defn get-text [history]

@@ -6,5 +6,6 @@
                  [mysql/mysql-connector-java "5.1.6"]
                  [org.clojure/java.jdbc "0.2.3"]
                  [org.clojure/data.json "0.2.2"]
+                 [org.apache.lucene/lucene-analyzers "3.6.0"]
                  ]
   :jvm-opts ["-Xmx1024M" "-server"])
