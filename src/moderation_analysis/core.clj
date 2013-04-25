@@ -156,16 +156,17 @@
         (for [[name fun] stat]
           [name (fun row)])))
 
-(defn row-analysis [{overall :overall time :time stat :stat} row]
-  (let [row-stat (get-stat row)
-        new-stat (merge-stat stat row-stat)
-        overall (inc overall)
-        now (System/currentTimeMillis)
-        new-time (if (-> overall (rem 10000) zero?)
-                   (do (-> now (- time) (/ 1000) double (println " sec - " overall))
-                       now)
-                   time)]
-    {:overall overall :time new-time :stat new-stat}))
+(defn create-reduce [reduce-fun]
+  (fn [{overall :overall time :time stat :stat} row]
+    (let [row-stat (reduce-fun row)
+          new-stat (merge-stat stat row-stat)
+          overall (inc overall)
+          now (System/currentTimeMillis)
+          new-time (if (-> overall (rem 10000) zero?)
+                     (do (-> now (- time) (/ 1000) double (println " sec - " overall))
+                         now)
+                     time)]
+      {:overall overall :time new-time :stat new-stat})))
 
 (def latest-request "select * from history2 where type='bulletin' order by user_space_id desc limit ?")
 
@@ -173,11 +174,45 @@
 
 (def all-bulletins "select * from history2 where type='bulletin' limit ?")
 
-(defn analyze-hist [request file limit]
+
+(defn get-text [history]
+  (let [statuses (map :bulletin.adminPublishStatus history)
+        find-prev-version (fn [status x]
+                            [(->> statuses
+                                  (take x)
+                                  reverse
+                                  (drop-while #(or (nil? %) (= status %)))
+                                  count
+                                  dec)
+                             x])
+        select-clusters-fn (fn [status] (->> statuses
+                                             (map-indexed #(if (= %2 status) %1 nil))
+                                             (filter (comp not nil?))
+                                             (filter pos?)
+                                             (map (partial find-prev-version status))))
+        approve-pairs (select-clusters-fn 1)
+        decline-pairs (select-clusters-fn -4)
+        get-added-words (fn [[l r]] [["c" 1] ["b" 2]])
+        plus (fn [a b] (println b) (if (nil? a) b (+ a b)))
+        make-reduce (fn [k] (fn [stat value]
+                              (reduce
+                               (fn [m [word amount]]
+                                 (update-in m [word k] plus amount))
+                               stat
+                               (get-added-words value))))]
+    (println approve-pairs)
+    (println decline-pairs)
+    (reduce (make-reduce :bad)
+            (reduce (make-reduce :good) {} approve-pairs)
+            decline-pairs)
+  ))
+;;{"word" {:good 10 :bad 10000} "another word" {:good 1 :bad 35}}
+
+(defn analyze-hist [request file limit reduce-fun]
   (walk-rows mysql-history [request limit] rows
     (->> rows
          (pmap get-history)
-         (reduce row-analysis {:overall 0 :time (System/currentTimeMillis) :stat {}})
+         (reduce (create-reduce reduce-fun) {:overall 0 :time (System/currentTimeMillis) :stat {}})
          :stat
          sort-stat
          (spit file))))
@@ -194,12 +229,12 @@
     (invert-values #(-> % (/ overall) (* 100) double form read-string) m)))
 
 (defn split-files []
-  (let [file-names ["1", "5", "10", "all", "queue"]
+  (let [file-names ["5", "queue"]
         prefix "stats/dist-"
         dir-prefix "./stats/dir/"
         stat-prefix "./stats/stat/"
         dir-keys [:bulletinByDirectory, :enqueueByDirectory]
-        stat-keys [:bulletinByFirstEnqueueVersion, :bulletinByEnqueueAmount, :bulletinByInitialAdminPublishStatus]
+        stat-keys [:ignoredModerations :bulletinByFirstEnqueueVersion, :bulletinByEnqueueAmount, :bulletinByInitialAdminPublishStatus]
         maps (into {} (for [name file-names]
                         [name (->> name
                                    (str prefix)
@@ -212,3 +247,5 @@
       (do
         (spit (str dir-prefix name) (select-keys stats dir-keys))
         (spit (str stat-prefix name) (select-keys stats stat-keys))))))
+
+    
