@@ -175,6 +175,15 @@
 (def all-bulletins "select * from history2 where type='bulletin' limit ?")
 
 
+(defn get-added-words [[l r] history]
+  (let [history (->> history (take (inc r)) (reductions merge) (map :bulletin.text))
+        to-words (fn [str] (->> str (.split #" ") vec))
+        left (apply hash-set (-> history (nth l) to-words distinct))
+        right (apply hash-set (-> history (nth r) to-words distinct))
+        difff (clojure.set/difference right left)]
+    (map #(.trim %) difff)))
+        
+
 (defn get-text [history]
   (let [statuses (map :bulletin.adminPublishStatus history)
         find-prev-version (fn [status x]
@@ -192,18 +201,15 @@
                                              (map (partial find-prev-version status))))
         approve-pairs (select-clusters-fn 1)
         decline-pairs (select-clusters-fn -4)
-        get-added-words (fn [[l r]] [["c" 1] ["b" 2]])
-        plus (fn [a b] (println b) (if (nil? a) b (+ a b)))
+        plus (fn [a] (if (nil? a) 1 (inc a)))
         make-reduce (fn [k] (fn [stat value]
                               (reduce
-                               (fn [m [word amount]]
-                                 (update-in m [word k] plus amount))
+                               (fn [m word]
+                                 (update-in m [word k] plus))
                                stat
-                               (get-added-words value))))]
-    (println approve-pairs)
-    (println decline-pairs)
+                               (get-added-words value history))))]
     (reduce (make-reduce :bad)
-            (reduce (make-reduce :good) {} approve-pairs)
+            {};;(reduce (make-reduce :good) {} approve-pairs)
             decline-pairs)
   ))
 ;;{"word" {:good 10 :bad 10000} "another word" {:good 1 :bad 35}}
