@@ -83,19 +83,27 @@
 (defn moder-pred [status]
   (or (= status 0) (= status -1)))
   
-(defn count-moderation [history]
-  (let [moderated-amount (->> history
-                              (map :bulletin.adminPublishStatus)
-                              (filter moder-pred)
-                              count)]
-    {moderated-amount 1}))
+(defn count-enqueues [history]
+  (let [enqueues (->> history
+                      (map :bulletin.adminPublishStatus)
+                      (filter (comp not nil?))
+                      count)]
+    {enqueues 1}))
+
+(def stat-0
+  {:bulletinByDirectory
+   (fn [h] {(-> h first :bulletin.dir) 1})
+   
+   :enqueueByDirectory
+   (fn [h] {(-> h first :bulletin.dir)
+            (->> h count-enqueues keys first)})})
 
 (def stat {:bulletinByEnqueueAmount
-           count-moderation
-
+           count-enqueues
+           
            :bulletinByFirstEnqueueVersion
            (fn [h] (let [first-index (->> h
-                                          (filter #(-> % :bulletin.adminPublishStatus moder-pred))
+                                          (filter #(-> % :bulletin.adminPublishStatus nil? not))
                                           first
                                           :bulletin.version)]
                      {first-index 1}))
@@ -108,9 +116,25 @@
            
            :enqueueByDirectory
            (fn [h] {(-> h first :bulletin.dir)
-                    (->> h count-moderation keys first)})
-           
+                    (->> h count-enqueues keys first)
+            })
+
+           :ignoredModerations
+           (fn [h] (let [count (-> h count-enqueues keys first)
+                         initial (-> h first :bulletin.adminPublishStatus)
+                         ignored (or false (and (= 1 count) (= 0 initial)))]
+                     {:ignored (if ignored 1 0)}))
+
            })
+
+(def stat-1
+  {
+   :ignoredModerations
+   (fn [h] (let [count (-> h count-enqueues keys first)
+                 initial (-> h first :bulletin.adminPublishStatus)
+                 ignored (or false (and (= 1 count) (= 0 initial)))]
+             {:ignored (if ignored 1 0)}))
+   })
 
 (defn get-history [row]
   (->> row :history json/read-json :ol (map :state)))
@@ -164,7 +188,7 @@
 (defn invert-values [f m]
   (into (sorted-map) (for [[k v] m] [(f v) k])))
 
-(defn normalize-distribution-1 [m]
+(defn normalize-distribution [m]
   (let [overall (->> m vals (apply +))
         form (partial format "%.2f")]
     (invert-values #(-> % (/ overall) (* 100) double form read-string) m)))
@@ -182,7 +206,7 @@
                                    slurp
                                    read-string
                                    (map-values (partial into {}))
-                                   (map-values normalize-distribution-1)
+                                   (map-values normalize-distribution)
                                    )]))]
     (for [[name stats] maps]
       (do
