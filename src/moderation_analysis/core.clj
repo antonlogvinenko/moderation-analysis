@@ -193,14 +193,22 @@
 (defn fuck-a-word [word]
   (-> word .trim .toLowerCase remove-shit get-stem))
 
+(defn to-words [str]
+  (->> str (.split #"\s+") vec (map fuck-a-word)))
+
+(defn restore-history [history r]
+  (->> history
+       (take (inc r))
+       (reductions merge)
+       (map :bulletin.text)
+       (map #(if (nil? %) "" %))))
+
 (defn get-added-words [[l r] history]
-  (let [history (->> history (take (inc r)) (reductions merge) (map :bulletin.text))
-        history (map #(if (nil? %) "" %) history)
-        to-words (fn [str] (->> str (.split #"\s+") vec (map fuck-a-word)))
+  (let [history (restore-history history r)
         left (apply hash-set (-> history (nth l) to-words distinct))
         right (apply hash-set (-> history (nth r) to-words distinct))
         difff (clojure.set/difference right left)]
-    fuck-a-word difff))
+    difff))
 
 (defn sorted-words [key m]
   (sort #(> (second %1) (second %2))
@@ -209,9 +217,42 @@
                   (let [value (stat key)]
                     (if (-> value nil? not)
                       [word value] nil))))))
-        
+
+(defn get-statuses [history]
+  (map :bulletin.adminPublishStatus history))
+
+(defn get-words [value history]
+  (let [history (restore-history history value)
+        words (apply hash-set (-> history (nth value) to-words distinct))]
+    words))
+
+(defn pluss [a]
+  (if (nil? a) 1 (inc a)))
+
+(defn get-text-versions [history]
+  (let [statuses (get-statuses history)
+        find-statuses (fn [status]
+                        (->> statuses
+                             (map-indexed #(if (= %2 status) %1 nil))
+                             (filter (comp not nil?))))
+        approves (find-statuses 1)
+        declines (find-statuses -4)
+        make-reduce (fn [k] (fn [stat value]
+                              (reduce
+                               (fn [m word]
+                                 (update-in m [word k] pluss))
+                               stat
+                               (get-words value history))))
+        words (reduce (make-reduce :bad)
+                      (reduce (make-reduce :good) {} approves)
+                      declines)]
+    (assoc-in
+     (assoc-in words [:info :bad] (count declines))
+     [:info :good] (count approves))
+    ))
+
 (defn get-text-diffed [history]
-  (let [statuses (map :bulletin.adminPublishStatus history)
+  (let [statuses (get-statuses history)
         find-prev-version (fn [status x]
                             [(->> statuses
                                   (take x)
@@ -227,18 +268,16 @@
                                              (map (partial find-prev-version status))))
         approve-pairs (select-clusters-fn 1)
         decline-pairs (select-clusters-fn -4)
-        plus (fn [a] (if (nil? a) 1 (inc a)))
         make-reduce (fn [k] (fn [stat value]
                               (reduce
                                (fn [m word]
-                                 (update-in m [word k] plus))
+                                 (update-in m [word k] pluss))
                                stat
                                (get-added-words value history))))
         words (reduce (make-reduce :bad)
                       (reduce (make-reduce :good) {} approve-pairs)
                       decline-pairs)]
-    words
-    ))
+    words))
 ;;{"word" {:good 10 :bad 10000} "another word" {:good 1 :bad 35}}
 
 
