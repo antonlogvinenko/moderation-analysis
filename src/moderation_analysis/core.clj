@@ -175,6 +175,11 @@
 
 (def all-bulletins "select * from history2 where type='bulletin' limit ?")
 
+
+
+
+
+
 (def stemmer (RussianStemmer.))
 
 (defn remove-shit [word]
@@ -190,12 +195,12 @@
 
 (defn get-added-words [[l r] history]
   (let [history (->> history (take (inc r)) (reductions merge) (map :bulletin.text))
+        history (map #(if (nil? %) "" %) history)
         to-words (fn [str] (->> str (.split #"\s+") vec (map fuck-a-word)))
         left (apply hash-set (-> history (nth l) to-words distinct))
         right (apply hash-set (-> history (nth r) to-words distinct))
         difff (clojure.set/difference right left)]
     fuck-a-word difff))
-
 
 (defn sorted-words [key m]
   (sort #(> (second %1) (second %2))
@@ -236,6 +241,12 @@
     ))
 ;;{"word" {:good 10 :bad 10000} "another word" {:good 1 :bad 35}}
 
+
+
+
+
+
+
 (defn analyze-hist [request limit reduce-fun]
   (walk-rows mysql-history [request limit] rows
     (->> rows
@@ -273,5 +284,3 @@
       (do
         (spit (str dir-prefix name) (select-keys stats dir-keys))
         (spit (str stat-prefix name) (select-keys stats stat-keys))))))
-
-    
