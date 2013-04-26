@@ -176,7 +176,9 @@
 
 (def stemmer (RussianStemmer.))
 
-(defn remove-shit [word] word)
+(defn remove-shit [word]
+  (let [symbols "[0123456789.,:;?!-+%$@#^&*=±§<>'\"{}]"]
+    (.replaceAll word symbols "")))
 
 (defn get-stem [word]
   (doto stemmer (.setCurrent word) .stem)
@@ -187,12 +189,17 @@
 
 (defn get-added-words [[l r] history]
   (let [history (->> history (take (inc r)) (reductions merge) (map :bulletin.text))
-        to-words (fn [str] (->> str (.split #"\W+") vec))
+        to-words (fn [str] (->> str (.split #"\s+") vec (map fuck-a-word)))
         left (apply hash-set (-> history (nth l) to-words distinct))
         right (apply hash-set (-> history (nth r) to-words distinct))
         difff (clojure.set/difference right left)]
-    (map fuck-a-word difff)))
-        
+    fuck-a-word difff))
+
+(defn sorted-words [m key]
+  (sort #(> (val %1) (val %2))
+        (into {} (for [[word {v key}] m]
+                   [word v]))))
+
 
 (defn get-text [history]
   (let [statuses (map :bulletin.adminPublishStatus history)
@@ -217,11 +224,12 @@
                                (fn [m word]
                                  (update-in m [word k] plus))
                                stat
-                               (get-added-words value history))))]
-    (reduce (make-reduce :bad)
-            {};;(reduce (make-reduce :good) {} approve-pairs)
-            decline-pairs)
-  ))
+                               (get-added-words value history))))
+        words (reduce (make-reduce :bad)
+                      {};;(reduce (make-reduce :good) {} approve-pairs)
+                      decline-pairs)]
+    words
+    ))
 ;;{"word" {:good 10 :bad 10000} "another word" {:good 1 :bad 35}}
 
 (defn analyze-hist [request file limit reduce-fun]
