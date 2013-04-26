@@ -141,7 +141,8 @@
 
 (defn sort-distr [distr]
   (->> distr
-       (sort #(> (val %1) (val %2)))))
+       (sort #(> (val %1) (val %2)))
+       (into {})))
 
 (defn sort-stat [stat]
   (into {}
@@ -195,13 +196,16 @@
         difff (clojure.set/difference right left)]
     fuck-a-word difff))
 
-(defn sorted-words [m key]
-  (sort #(> (val %1) (val %2))
-        (into {} (for [[word {v key}] m]
-                   [word v]))))
 
-
-(defn get-text [history]
+(defn sorted-words [key m]
+  (sort #(> (second %1) (second %2))
+        (filter (comp not nil?)
+                (for [[word stat] m]
+                  (let [value (stat key)]
+                    (if (-> value nil? not)
+                      [word value] nil))))))
+        
+(defn get-text-diffed [history]
   (let [statuses (map :bulletin.adminPublishStatus history)
         find-prev-version (fn [status x]
                             [(->> statuses
@@ -226,20 +230,18 @@
                                stat
                                (get-added-words value history))))
         words (reduce (make-reduce :bad)
-                      {};;(reduce (make-reduce :good) {} approve-pairs)
+                      (reduce (make-reduce :good) {} approve-pairs)
                       decline-pairs)]
     words
     ))
 ;;{"word" {:good 10 :bad 10000} "another word" {:good 1 :bad 35}}
 
-(defn analyze-hist [request file limit reduce-fun]
+(defn analyze-hist [request limit reduce-fun]
   (walk-rows mysql-history [request limit] rows
     (->> rows
          (pmap get-history)
          (reduce (create-reduce reduce-fun) {:overall 0 :time (System/currentTimeMillis) :stat {}})
-         :stat
-         sort-stat
-         (spit file))))
+         :stat)))
 
 (defn map-values [f m]
   (into {} (for [[k v] m] [k (f v)])))
