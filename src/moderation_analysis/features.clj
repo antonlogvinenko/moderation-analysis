@@ -1,7 +1,6 @@
 (ns moderation-analysis.features
   (:require [clojure.data.json :as json])
-  (:use [incanter core])
-  (:import [org.tartarus.snowball.ext RussianStemmer]))
+  (:use [incanter core]))
 
 (defn idx [coll idx1 idx2]
   (-> coll (nth idx1) (nth idx2)))

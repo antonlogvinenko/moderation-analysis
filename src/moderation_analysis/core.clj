@@ -278,7 +278,10 @@
         words (reduce (make-reduce :bad)
                       (reduce (make-reduce :good) {} approve-pairs)
                       decline-pairs)]
-    words))
+    (assoc-in
+     (assoc-in words [:info :bad] (count decline-pairs))
+     [:info :good] (count approve-pairs))))
+
 ;;{"word" {:good 10 :bad 10000} "another word" {:good 1 :bad 35}}
 
 
