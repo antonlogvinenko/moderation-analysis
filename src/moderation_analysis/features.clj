@@ -12,9 +12,7 @@
   (+ (idx n 0 i) (idx n 1 i)))
 
 (defn mi-ij [n i j]
-  (let [n-all (->> n
-                   (map (partial reduce +))
-                   (reduce +))
+  (let [n-all (->> n flatten (reduce +))
         nij (idx n i j)
         nix (n-ix-sum n i)
         nxj (n-xi-sum n j)]
@@ -22,7 +20,7 @@
         (-> nij (* n-all) (/ nix) (/ nxj) log2 (* nij) (/ n-all)))))
 
 (defn mi [n]
-  (let [indexes [0 1]]
-    (->> (for [i indexes, j indexes] [i j])
-         (map #(apply mi-ij n %))
-         (apply +))))
+  (->> [[0 0] [0 1] [1 0] [1 1]]
+       (map #(apply mi-ij n %))
+       (apply +)))
+
