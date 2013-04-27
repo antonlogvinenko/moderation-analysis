@@ -2,7 +2,8 @@
    (:require [clojure.java.jdbc :as sql]
             [clojure.string :as string]
             [clojure.data.json :as json])
-   (:use [incanter core charts stats datasets])
+   (:use [incanter core charts stats datasets]
+         [moderation-analysis features])
    (:import [org.tartarus.snowball.ext RussianStemmer]))
 
 
@@ -281,7 +282,25 @@
 ;;{"word" {:good 10 :bad 10000} "another word" {:good 1 :bad 35}}
 
 
+(defn zerofy [n]
+  (if (nil? n) 0 n))
 
+(defn create-n [good bad good-count bad-count]
+  (let [good (zerofy good)
+        bad (zerofy bad)
+        n [[good bad]
+           [(- good-count good) (- bad-count bad)]]]
+    n))
+  
+(defn feature-selection [data]
+  (let [good-count (->> data :info :good)
+        bad-count (->> data :info :bad)]
+    (for [[word {good :good bad :bad}] data]
+      [word (mi (create-n good bad good-count bad-count))])))
+           
+        
+  
+  
 
 
 
