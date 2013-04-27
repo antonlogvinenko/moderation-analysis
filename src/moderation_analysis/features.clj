@@ -2,6 +2,9 @@
   (:require [clojure.data.json :as json])
   (:use [incanter core]))
 
+;;http://bazhenov.me/blog/2012/12/10/feature-selection.html
+;;http://nlp.stanford.edu/IR-book/html/htmledition/mutual-information-1.html#fig:mccallum
+
 (defn idx [coll idx1 idx2]
   (-> coll (nth idx1) (nth idx2)))
 
