@@ -4,7 +4,10 @@
             [clojure.data.json :as json])
    (:use [incanter core charts stats datasets]
          [moderation-analysis features])
-   (:import [org.tartarus.snowball.ext RussianStemmer]))
+   (:import [org.tartarus.snowball.ext RussianStemmer]
+            [org.apache.lucene.analysis KeywordTokenizer LetterTokenizer]
+            [org.apache.lucene.analysis.tokenattributes OffsetAttribute CharTermAttribute]))
+
 
 
 (def mysql-properties {:classname "com.mysql.jdbc.Driver"
@@ -183,19 +186,26 @@
 
 (def stemmer (RussianStemmer.))
 
-(defn remove-shit [word]
-  (let [symbols "[0123456789.,:;?!-+%$@#^&*=±§<>'\"{}]"]
-    (.replaceAll word symbols "")))
+(defn remove-shit [text]
+  (let [symbols "[0123456789.,:;?!-+%$@#^&*=±§<>'\"{}//°\\-_~`\"\\\\]"]
+    (-> text
+        (.replaceAll symbols "")
+        (.replaceAll "\\\\" ""))))
 
 (defn get-stem [word]
   (doto stemmer (.setCurrent word) .stem)
   (.getCurrent stemmer))
 
-(defn fuck-a-word [word]
-  (-> word .trim .toLowerCase remove-shit get-stem))
+(defn normalize-word [word]
+  (-> word .trim .toLowerCase get-stem))
 
-(defn to-words [str]
-  (->> str (.split #"\s+") vec (map fuck-a-word)))
+(defn to-words [text]
+  (let [symbols "[0123456789.,:;?!-+%$@#^&*=±§<>'\"{}//°\\-_~`\"]"]
+    (->> (.replaceAll text symbols " ")
+         (.split #"\s+")
+         vec
+         (filter (comp not empty?))
+         (map normalize-word))))
 
 (defn restore-history [history r]
   (->> history
@@ -307,13 +317,18 @@
 
 
 
-
 (defn analyze-hist [request limit reduce-fun]
   (walk-rows mysql-history [request limit] rows
     (->> rows
          (pmap get-history)
          (reduce (create-reduce reduce-fun) {:overall 0 :time (System/currentTimeMillis) :stat {}})
          :stat)))
+
+
+(defn run [n]
+  (->> get-text-diffed (analyze-hist latest-request n) (spit "data-diffed"))
+  (->> get-text-versions (analyze-hist latest-request n) (spit "data-versions")))
+
 
 (defn map-values [f m]
   (into {} (for [[k v] m] [k (f v)])))
