@@ -328,10 +328,8 @@
 (defn run [n]
   (letfn [(analyze [fun file]
             (->> fun (analyze-hist latest-request n) (spit file)))
-
           (features [file1 file2]
             (->> file1 slurp read-string feature-selection vec (spit file2)))
-          
           (print-some [file]
             (->> file slurp read-string (sort #(> (second %1) (second %2))) (take 20) println))]
     (let [data-diffed "data-diffed", data-versions "data-versions"
