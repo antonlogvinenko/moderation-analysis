@@ -326,8 +326,23 @@
 
 
 (defn run [n]
-  (->> get-text-diffed (analyze-hist latest-request n) (spit "data-diffed"))
-  (->> get-text-versions (analyze-hist latest-request n) (spit "data-versions")))
+  (letfn [(analyze [fun file]
+            (->> fun (analyze-hist latest-request n) (spit file)))
+
+          (features [file1 file2]
+            (->> file1 slurp read-string feature-selection vec (spit file2)))
+          
+          (print-some [file]
+            (->> file slurp read-string (sort #(> (second %1) (second %2))) (take 20) println))]
+    (let [data-diffed "data-diffed", data-versions "data-versions"
+          features-diffed "features-diffed", features-versions "features-versions"]
+      (analyze get-text-diffed data-diffed)
+      (analyze get-text-versions data-versions)
+      (features data-diffed features-diffed)
+      (features data-versions features-versions)
+      (print-some features-diffed)
+      (print-some features-versions))))
+
 
 
 (defn map-values [f m]
