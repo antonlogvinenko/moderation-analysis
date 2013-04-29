@@ -1,14 +1,15 @@
 (ns moderation-analysis.core
    (:require [clojure.java.jdbc :as sql]
             [clojure.string :as string]
-            [clojure.data.json :as json])
+            [clojure.data.json :as json]
+            [clj-diff.core :as diff])
    (:use [incanter core charts stats datasets]
          [moderation-analysis features])
    (:import [org.tartarus.snowball.ext RussianStemmer]
             [org.apache.lucene.analysis KeywordTokenizer LetterTokenizer]
             [org.apache.lucene.analysis.tokenattributes OffsetAttribute CharTermAttribute]))
 
-
+;;levenshtein-distance
 
 (def mysql-properties {:classname "com.mysql.jdbc.Driver"
                        :subprotocol "mysql"
@@ -24,8 +25,8 @@
   {:fetch-size Integer/MIN_VALUE
    :concurrency :read-only
    :result-type :forward-only
-   :prefetch-size 10000
-   :chunk-size 10000})
+   :prefetch-size 1000
+   :chunk-size 1000})
 
 (defmacro walk-rows [props query results & body]
   `(with-connection ~props
@@ -373,3 +374,36 @@
       (do
         (spit (str dir-prefix name) (select-keys stats dir-keys))
         (spit (str stat-prefix name) (select-keys stats stat-keys))))))
+
+
+;;Считаю, во сколько раз можно сжать датасет, если использовать
+;;расстояние Левенштейна для хранения диффов между текстами объявлений
+(defn compute [{compressed :compressed original :original cnt :count} history]
+  (let [history (->> history (filter (comp not nil?)))
+        original-count (->> history
+                            (map count)
+                            (reduce +))
+        compressed-count (->> history
+                              (drop 1)
+                              (interleave history)
+                              (partition 2)
+                              (map #(diff/diff (first %) (second %)))
+                              (map str)
+                              (map count)
+                              (reduce +)
+                              (+ (-> history first count)))]
+    (if (-> cnt (rem 10000) zero?) (println cnt))
+    {:count (inc cnt)
+     :compressed (+ compressed compressed-count)
+     :original (+ original original-count)}))
+
+(defn show [f x] (-> x f println) x)
+
+(defn cake [request limit]
+  (walk-rows mysql-history [request limit] rows
+    (->> rows
+         (pmap (comp (partial map (comp :bulletin.text :state))
+                     :ol
+                     json/read-json
+                     :history))
+         (reduce compute {:compressed 0 :original 0 :count 0}))))
