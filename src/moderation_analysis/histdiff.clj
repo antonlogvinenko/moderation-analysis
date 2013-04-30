@@ -26,7 +26,7 @@
 
 (defn show [f x] (-> x f println) x)
 
-(defn cake [request limit]
+(defn compute [request limit]
   (walk-rows mysql-history [request limit] rows
     (->> rows
          (pmap (comp (partial map (comp :bulletin.text :state))
