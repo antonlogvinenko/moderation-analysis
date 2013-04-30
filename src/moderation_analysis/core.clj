@@ -1,86 +1,17 @@
 (ns moderation-analysis.core
    (:require [clojure.java.jdbc :as sql]
             [clojure.string :as string]
-            [clojure.data.json :as json]
-            [clj-diff.core :as diff])
+            [clojure.data.json :as json])
    (:use [incanter core charts stats datasets]
-         [moderation-analysis features])
+         [moderation-analysis features mysql])
    (:import [org.tartarus.snowball.ext RussianStemmer]
             [org.apache.lucene.analysis KeywordTokenizer LetterTokenizer]
             [org.apache.lucene.analysis.tokenattributes OffsetAttribute CharTermAttribute]))
-
-;;levenshtein-distance
-
-(def mysql-properties {:classname "com.mysql.jdbc.Driver"
-                       :subprotocol "mysql"
-                       :subname "//127.0.0.1:3306/test"
-                       :user ""
-                       :password ""})
-
-(defmacro with-connection [props query results & body]
-  `(sql/with-connection ~props
-      (sql/with-query-results ~results ~query ~@body)))
-
-(def lazy
-  {:fetch-size Integer/MIN_VALUE
-   :concurrency :read-only
-   :result-type :forward-only
-   :prefetch-size 1000
-   :chunk-size 1000})
-
-(defmacro walk-rows [props query results & body]
-  `(with-connection ~props
-       (->> ~query (cons lazy) vec)
-       ~results ~@body))
-
-(defn get-decisions [status user]
-  (with-connection mysql-properties ["select count(*) as c from bulletin_moderation_history where bulletin_owner_id = ? and user_id != 0 and status = ?" user status]
-      result (-> result first :c)))
-
-(defn get-rating [user]
-  (let [a (get-decisions "approved" user)
-        d (get-decisions "declined" user)
-        sum (+ a d)]
-    (if (zero? sum) 0 (/ a sum))))
-
-;720456
-(def c 720456)
-
-(defn save-data [ratings]
-  (doseq [rating ratings]
-    (spit "ratings.txt"
-          (str rating " ")
-          :append true)))
-  
-(defn run []
-  (walk-rows mysql-properties ["select distinct bulletin_owner_id from bulletin_moderation_history limit ?" c] users
-    (->> users
-         (map :bulletin_owner_id)
-         (map get-rating)
-         save-data)))
-
-
-(def default-width 1100)
-(def default-height 440)
-
-(defn show [n]
-  (let [ratings-str (-> "ratings.txt" slurp (string/split #" "))
-        ratings (->> ratings-str (map read-string) (take n))]
-    (-> ratings
-        (histogram :x-label "rating" :nbins 30)
-        (view :width default-width :height default-height))))
-
 
 
 ;; Analyzing moderation bulletin history
 
 (defn debug [x] (println x) x)
-
-(def mysql-history {:classname "com.mysql.jdbc.Driver"
-                    :subprotocol "mysql"
-                    :subname "//127.0.0.1:3306/bul_history"
-                    :user "anton"
-                    :password ""})
 
 (defn count-versions [history]
   (count history))
@@ -374,36 +305,3 @@
       (do
         (spit (str dir-prefix name) (select-keys stats dir-keys))
         (spit (str stat-prefix name) (select-keys stats stat-keys))))))
-
-
-;;Считаю, во сколько раз можно сжать датасет, если использовать
-;;расстояние Левенштейна для хранения диффов между текстами объявлений
-(defn compute [{compressed :compressed original :original cnt :count} history]
-  (let [history (->> history (filter (comp not nil?)))
-        original-count (->> history
-                            (map count)
-                            (reduce +))
-        compressed-count (->> history
-                              (drop 1)
-                              (interleave history)
-                              (partition 2)
-                              (map #(diff/diff (first %) (second %)))
-                              (map str)
-                              (map count)
-                              (reduce +)
-                              (+ (-> history first count)))]
-    (if (-> cnt (rem 10000) zero?) (println cnt))
-    {:count (inc cnt)
-     :compressed (+ compressed compressed-count)
-     :original (+ original original-count)}))
-
-(defn show [f x] (-> x f println) x)
-
-(defn cake [request limit]
-  (walk-rows mysql-history [request limit] rows
-    (->> rows
-         (pmap (comp (partial map (comp :bulletin.text :state))
-                     :ol
-                     json/read-json
-                     :history))
-         (reduce compute {:compressed 0 :original 0 :count 0}))))
