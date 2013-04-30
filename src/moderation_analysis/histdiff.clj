@@ -1,7 +1,7 @@
 (ns moderation-analysis.histdiff
-  (:use [moderation-analysis mysql]
-        [clj-diff.core :as diff]
-        [clojure.data.json :as json]))
+  (:use [moderation-analysis mysql])
+  (:require [clj-diff.core :as diff]
+            [clojure.data.json :as json]))
 
 ;;Считаю, во сколько раз можно сжать датасет, если использовать
 ;;расстояние Левенштейна для хранения диффов между текстами объявлений
