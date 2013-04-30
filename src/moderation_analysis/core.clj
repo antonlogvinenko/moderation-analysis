@@ -1,9 +1,9 @@
 (ns moderation-analysis.core
    (:require [clojure.java.jdbc :as sql]
-            [clojure.string :as string]
-            [clojure.data.json :as json])
+            [clojure.string :as string])
    (:use [incanter core charts stats datasets]
-         [moderation-analysis features mysql])
+         [moderation-analysis features mysql]
+         [clojure.data.json :as json])
    (:import [org.tartarus.snowball.ext RussianStemmer]
             [org.apache.lucene.analysis KeywordTokenizer LetterTokenizer]
             [org.apache.lucene.analysis.tokenattributes OffsetAttribute CharTermAttribute]))

@@ -1,7 +1,8 @@
 (ns moderation-analysis.ratings
-  (:use [moderation-analysis mysql]))
-;;        [clojure.string :as string]
-  ;;      [incanter core charts stats datasets]))
+  (:require [clojure.string :as string])
+  (:use [moderation-analysis mysql]
+        [incanter core charts]))
+
 
 (defn get-decisions [status user]
   (with-connection mysql-properties ["select count(*) as c from bulletin_moderation_history where bulletin_owner_id = ? and user_id != 0 and status = ?" user status]
@@ -28,7 +29,6 @@
          (map :bulletin_owner_id)
          (map get-rating)
          save-data)))
-
 
 (def default-width 1100)
 (def default-height 440)
