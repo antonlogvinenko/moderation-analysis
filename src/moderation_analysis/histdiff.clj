@@ -3,8 +3,6 @@
   (:require [clj-diff.core :as diff]
             [clojure.data.json :as json]))
 
-;;Считаю, во сколько раз можно сжать датасет, если использовать
-;;расстояние Левенштейна для хранения диффов между текстами объявлений
 (defn compute [{compressed :compressed original :original cnt :count} history]
   (let [history (->> history (filter (comp not nil?)))
         original-count (->> history
