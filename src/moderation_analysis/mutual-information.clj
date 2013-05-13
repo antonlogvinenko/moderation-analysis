@@ -130,6 +130,9 @@
 (defn get-stat [m k]
   (if-let [v (k m)] v 1))
 
+
+
+;;searching for most frequent words in approves/declines
 (defn check-reduce [acc v]
   (let [info (second v)
         k (first v)
@@ -139,6 +142,15 @@
            (assoc info
            :rate (double (/ (get-stat info :good) (get-stat info :bad)))))))    
 
+(defn sort-check [comparison]
+  (->> "output"
+       slurp
+       read-string
+       (sort #(comparison (-> %2 second :rate) (-> %1 second :rate)))
+       (take 20)
+       vec
+       (spit "output-3")))
+
 (defn check []
   (let [data (->> "data-versions" slurp read-string)
         amount (count data)]
@@ -146,7 +158,24 @@
     (->> data
          (reduce check-reduce {})
          (spit "output"))))
-    
+
+
+(def typed-dirs [83 106 332 775 773 338 340 349 393 461 503 171 604 337 594 615 692 772 240 335 616 352 774 125 434 403 241 3])
+;;BZR-10750
+(defn untyped-bulletins [history]
+  (let [bulletin (->> history (reductions merge) last)
+        dir (-> bulletin :bulletin.dir)
+        type (:bulletin.type bulletin)
+        lemma (:type.lemma bulletin)
+        counts? (and (nil? lemma)
+                     (not= type "bulletinAdvertisement")
+                     (some (partial = dir) typed-dirs))]
+;;    (if (nil? lemma) nil (println lemma))
+    {:untyped {:count (if counts? 1 0)}}
+    ))
+
+
+
 (defn run [n]
   (letfn [(analyze [fun file]
             (->> fun (analyze-hist latest-request n) (spit file)))
