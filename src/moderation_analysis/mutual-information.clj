@@ -107,6 +107,7 @@
      (assoc-in words [:info :bad] (count decline-pairs))
      [:info :good] (count approve-pairs))))
 
+
 ;;{"word" {:good 10 :bad 10000} "another word" {:good 1 :bad 35}}
 
 
@@ -125,7 +126,27 @@
         bad-count (->> data :info :bad)]
     (for [[word {good :good bad :bad}] data]
       [word (mi (create-n good bad good-count bad-count))])))
-           
+
+(defn get-stat [m k]
+  (if-let [v (k m)] v 1))
+
+(defn check-reduce [acc v]
+  (let [info (second v)
+        k (first v)
+        amount (count acc)]
+    (if (-> amount (mod 100000) zero?) (println amount))
+    (assoc acc k
+           (assoc info
+           :rate (double (/ (get-stat info :good) (get-stat info :bad)))))))    
+
+(defn check []
+  (let [data (->> "data-versions" slurp read-string)
+        amount (count data)]
+    (println "Overall: " amount)
+    (->> data
+         (reduce check-reduce {})
+         (spit "output"))))
+    
 (defn run [n]
   (letfn [(analyze [fun file]
             (->> fun (analyze-hist latest-request n) (spit file)))
