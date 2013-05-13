@@ -164,16 +164,15 @@
 ;;BZR-10750
 (defn untyped-bulletins [history]
   (let [bulletin (->> history (reductions merge) last)
+        status (:bulletin.adminPublishStatus bulletin)
         dir (-> bulletin :bulletin.dir)
         type (:bulletin.type bulletin)
         lemma (:type.lemma bulletin)
         counts? (and (nil? lemma)
                      (not= type "bulletinAdvertisement")
                      (some (partial = dir) typed-dirs))]
-;;    (if (nil? lemma) nil (println lemma))
-    {:untyped {:count (if counts? 1 0)}}
-    ))
-
+    ;;    (if (nil? lemma) nil (println lemma))
+    {:untyped (if counts? {status 1} {})}))
 
 
 (defn run [n]
